@@ -93,5 +93,41 @@ grid1 <- plot_grid(p1, p2, p3, p4, nrow = 2,
 grid1
 
 
-#ESTAT?STICAS DESCRITIVAS
+#ESTATISTICAS DESCRITIVAS
+
+#assimetria e curtose nao vem com o R
+library(moments)
+library(xtable)
+
+stat.desc = matrix(NA, nrow = 8, ncol = 1)
+
+rownames(stat.desc) = c("Obs.", "Min.", "Media", "Mediana", "Max.", "D.P.", "Assim.", "Curt.")
+colnames(stat.desc) = c("Retorno")
+
+calc.stat.desc = function(x){
+  out = rep(0, 8)
+  out[1] = length(x)
+  out[2] = min(x)
+  out[3] = mean(x)
+  out[4] = median(x)
+  out[5] = max(x)
+  out[6] = sd(x)
+  out[7] = skewness(x)
+  out[8] = kurtosis(x) #curtose bruta
+  return(out)
+}
+
+#multiplica os retornos por 100 para ficar mais facil de interpretar a tabela. Ou seja, mostra-se a porcentagem, nao numeros decimais
+stat.desc[,1] = calc.stat.desc(100*port.data$port.ret)
+
+#salva a tabela como arquivo
+tabela1 <- xtable(stat.desc, digits = 3)
+print.xtable(tabela1, type = "html", file = "tabela1.html")
+
+
+
+#TESTES DE RAIZ UNITARIA(?)
+
+#TESTE PARA EFEITOS ARCH
+
 
