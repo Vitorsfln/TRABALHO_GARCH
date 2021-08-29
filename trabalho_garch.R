@@ -130,4 +130,34 @@ print.xtable(tabela1, type = "html", file = "tabela1.html")
 
 #TESTE PARA EFEITOS ARCH
 
+#testa a autocorrelacao dos retornos quadraticos ate quinze defasagens
+library(FinTS)
+
+do_arch_test <- function(x, max_lag = 15) {
+  require(FinTS)
+  require(tidyverse)
+  
+  do_single_arch <- function(x, used_lag)  {
+    test_out <- FinTS::ArchTest(x, lags = used_lag)
+    
+    res_out <- tibble(Lag = used_lag,
+                      `LMStatistic` = test_out$statistic, 
+                      `pvalue` = test_out$p.value)
+  }
+  
+  tab_out <- bind_rows(map(1:max_lag,.f = do_single_arch, x = x))
+  
+  return(tab_out)
+}
+
+arch.lm <- do_arch_test(x = port.data$port.ret, max_lag = 15)
+
+tabela2 <- xtable(arch.lm)
+print.xtable(tabela2, type = "html", file = "tabela2.html")
+
+
+
+#SELECAO E ESTIMACAO DOS MODELOS
+
+
 
