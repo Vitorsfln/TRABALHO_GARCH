@@ -159,5 +159,94 @@ print.xtable(tabela2, type = "html", file = "tabela2.html")
 
 #SELECAO E ESTIMACAO DOS MODELOS
 
+library(rugarch)
+
+# arch 
+
+#escolhe a melhor defasagem atraves de criterios de informacao
+escolhe.ordem.arch = function(ret, modelo="sGARCH"){
+  max.order.q = 3
+  ICS = matrix(0, ncol = 2, nrow = 1*max.order.q)
+  nomes.linhas = vector(length = max.order.q)
+  cnt = 1
+  for (q in 2:max.order.q) {
+    spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
+                      variance.model = list(model = "sGARCH", garchOrder = c(q,0)),
+                      distribution.model = "norm")
+    fit = ugarchfit(data = port.data$port.ret, spec = spec, solver = 'hybrid')
+    print(q)
+    ICS[cnt,] = infocriteria(fit)[1:2]
+    nomes.linhas[cnt] = paste("ARCH(0,",q,")",sep = "")
+    cnt = cnt + 1
+  }  
+  melhor.AIC = (ICS[,1] == min(ICS[,1]))*1
+  melhor.BIC = (ICS[,2] == min(ICS[,2]))*1
+  out.mat = matrix(NA, ncol = 4, 1*max.order.q)
+  colnames(out.mat) = c("AIC", "min(AIC)", "BIC", "min(BIC)")
+  rownames(out.mat) = nomes.linhas
+  out.mat[,1] = ICS[,1]
+  out.mat[,2] = melhor.AIC
+  out.mat[,3] = ICS[,2]
+  out.mat[,4] = melhor.BIC
+  return(out.mat)
+}
+
+arch.BIC.AIC = escolhe.ordem.arch(port.data$port.ret)
+tabela3 <- xtable(arch.BIC.AIC)
+print.xtable(tabela3, type = "html", file = "tabela3.html")
+
+#primeiro fazemos a especificacao do modelo (no caso, a funcao teve problema para calcular os criterios do arch(1), mas podemos calcula-lo separadamente para comparar os valores), foi selecionado o arch(1)
+arch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
+                       variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
+                       distribution.model = "norm")
+
+#agora estimamos o modelo
+arch.fit = ugarchfit(data = port.data$port.ret, spec = arch.spec, solver = 'hybrid')
+
+
+# garch
+
+escolhe.ordem.garch = function(ret){
+  max.order.p = 3
+  max.order.q = 3
+  ICS = matrix(0, ncol = 2, nrow = max.order.p*max.order.q)
+  nomes.linhas = vector(length = max.order.p*max.order.q)
+  cnt = 1
+  for (p in  1:max.order.p){
+    for (q in 1:max.order.q) {
+      spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
+                        variance.model = list(model = "sGARCH", garchOrder = c(q,p)),
+                        distribution.model = "norm")
+      fit = ugarchfit(data = port.data$port.ret, spec = spec)
+      print(p)
+      print(q)
+      ICS[cnt,] = infocriteria(fit)[1:2]
+      nomes.linhas[cnt] = paste("GARCH(",p,",",q,")",sep="")
+      cnt = cnt + 1
+    }  
+  }
+  melhor.AIC = (ICS[,1] == min(ICS[,1]))*1
+  melhor.BIC = (ICS[,2] == min(ICS[,2]))*1
+  out.mat = matrix(NA, ncol = 4, nrow = max.order.p*max.order.q)
+  colnames(out.mat) = c("AIC", "min(AIC)", "BIC", "min(BIC)")
+  rownames(out.mat) = nomes.linhas
+  out.mat[,1] = ICS[,1]
+  out.mat[,2] = melhor.AIC
+  out.mat[,3] = ICS[,2]
+  out.mat[,4] = melhor.BIC
+  return(out.mat)
+}
+
+garch.BIC.AIC = escolhe.ordem.garch(port.data$port.ret)
+tabela4 <- xtable(garch.BIC.AIC)
+print.xtable(tabela4, type = "html", file = "tabela4.html")
+
+#foi selecionado o garch(1,1)
+garch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
+                        variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+                        distribution.model = "norm")
+
+garch.fit = ugarchfit(data = port.data$port.ret, spec = garch.spec)
+
 
 
