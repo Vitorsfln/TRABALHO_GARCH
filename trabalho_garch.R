@@ -32,15 +32,15 @@ price.data <- df %>%
             period = 'daily',
             col_rename = 'ret')
 
-#retira as observacoes perdidas no calculo dos retornos
 price.data <- price.data[-c(1, 1235, 2469), ]
 
-port.data <- price.data %>% 
+port.df <- price.data %>% 
   tq_portfolio(assets_col = ticker,
                returns_col = ret,
                weights = c(0.5, 0.3, 0.2),
                geometric = FALSE,
-               col_rename = 'port.ret')
+               col_rename = 'p.ret') %>% 
+  mutate(vol = sqrt((p.ret-mean(p.ret, na.rm = TRUE))^2) )
 
 
 
@@ -78,7 +78,7 @@ p3 <- ggplot(price.data[2467:3699, ], aes(data, ret)) +
   theme(panel.grid.minor = element_blank()) + 
   geom_hline(yintercept = 0, color = 'red') 
 
-p4 <- ggplot(port.data, aes(data, port.ret)) + 
+p4 <- ggplot(port.df, aes(data, p.ret)) + 
   geom_line() + 
   labs(title = ("PORTFOLIO"),
        x = " ",
@@ -95,13 +95,13 @@ grid1
 
 #ESTATISTICAS DESCRITIVAS
 
-#assimetria e curtose nao vem com o R
+#assimetria e curtose n?o vem com o R
 library(moments)
 library(xtable)
 
 stat.desc = matrix(NA, nrow = 8, ncol = 1)
 
-rownames(stat.desc) = c("Obs.", "Min.", "Media", "Mediana", "Max.", "D.P.", "Assim.", "Curt.")
+rownames(stat.desc) = c("Obs.", "M?n.", "M?dia", "Mediana", "M?x.", "D.P.", "Assim.", "Curt.")
 colnames(stat.desc) = c("Retorno")
 
 calc.stat.desc = function(x){
@@ -118,7 +118,7 @@ calc.stat.desc = function(x){
 }
 
 #multiplica os retornos por 100 para ficar mais facil de interpretar a tabela. Ou seja, mostra-se a porcentagem, nao numeros decimais
-stat.desc[,1] = calc.stat.desc(100*port.data$port.ret)
+stat.desc[,1] = calc.stat.desc(100*port.df$p.ret)
 
 #salva a tabela como arquivo
 tabela1 <- xtable(stat.desc, digits = 3)
@@ -127,6 +127,8 @@ print.xtable(tabela1, type = "html", file = "tabela1.html")
 
 
 #TESTES DE RAIZ UNITARIA(?)
+
+
 
 #TESTE PARA EFEITOS ARCH
 
@@ -150,7 +152,7 @@ do_arch_test <- function(x, max_lag = 15) {
   return(tab_out)
 }
 
-arch.lm <- do_arch_test(x = port.data$port.ret, max_lag = 15)
+arch.lm <- do_arch_test(x = port.df$p.ret, max_lag = 15)
 
 tabela2 <- xtable(arch.lm)
 print.xtable(tabela2, type = "html", file = "tabela2.html")
@@ -173,7 +175,7 @@ escolhe.ordem.arch = function(ret, modelo="sGARCH"){
     spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                       variance.model = list(model = "sGARCH", garchOrder = c(q,0)),
                       distribution.model = "norm")
-    fit = ugarchfit(data = port.data$port.ret, spec = spec, solver = 'hybrid')
+    fit = ugarchfit(data = port.df$p.ret, spec = spec, solver = 'hybrid')
     print(q)
     ICS[cnt,] = infocriteria(fit)[1:2]
     nomes.linhas[cnt] = paste("ARCH(0,",q,")",sep = "")
@@ -191,7 +193,7 @@ escolhe.ordem.arch = function(ret, modelo="sGARCH"){
   return(out.mat)
 }
 
-arch.BIC.AIC = escolhe.ordem.arch(port.data$port.ret)
+arch.BIC.AIC = escolhe.ordem.arch(port.df$p.ret)
 tabela3 <- xtable(arch.BIC.AIC)
 print.xtable(tabela3, type = "html", file = "tabela3.html")
 
@@ -201,7 +203,12 @@ arch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                        distribution.model = "norm")
 
 #agora estimamos o modelo
-arch.fit = ugarchfit(data = port.data$port.ret, spec = arch.spec, solver = 'hybrid')
+arch.fit = ugarchfit(data = port.df$p.ret, spec = arch.spec, solver = 'hybrid')
+
+#grafico do desvio padrao condicional estimado
+plot(port.df$data, port.df$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
+lines(port.df$data, arch.fit@fit$sigma, col = "red")
+title(main = "ARCH", line = 1, adj = 0)
 
 
 # garch
@@ -217,7 +224,7 @@ escolhe.ordem.garch = function(ret){
       spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                         variance.model = list(model = "sGARCH", garchOrder = c(q,p)),
                         distribution.model = "norm")
-      fit = ugarchfit(data = port.data$port.ret, spec = spec)
+      fit = ugarchfit(data = port.df$p.ret, spec = spec)
       print(p)
       print(q)
       ICS[cnt,] = infocriteria(fit)[1:2]
@@ -237,7 +244,7 @@ escolhe.ordem.garch = function(ret){
   return(out.mat)
 }
 
-garch.BIC.AIC = escolhe.ordem.garch(port.data$port.ret)
+garch.BIC.AIC = escolhe.ordem.garch(port.df$p.ret)
 tabela4 <- xtable(garch.BIC.AIC)
 print.xtable(tabela4, type = "html", file = "tabela4.html")
 
@@ -246,7 +253,40 @@ garch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                         variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
                         distribution.model = "norm")
 
-garch.fit = ugarchfit(data = port.data$port.ret, spec = garch.spec)
+garch.fit = ugarchfit(data = port.df$p.ret, spec = garch.spec)
 
+#grafico do desvio padrao condicional estimado
+plot(port.df$data, port.df$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
+lines(port.df$data, garch.fit@fit$sigma, col = "red")
+title(main = "GARCH", line = 1, adj = 0)
+
+
+
+#VALUE AT RISK DENTRO DA AMOSTRA
+
+# arch
+
+#calcula VaR5
+in.sample.fit.arch = arch.fit@fit$sigma
+
+in.sample.VaR5.arch = mean(port.df$p.ret) + qnorm(0.05)*in.sample.fit.arch
+
+#grafico VaR5
+plot(port.df$data, port.df$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
+lines(port.df$data, qnorm(0.05)*sqrt(arch.fit@fit$var), col = "red")
+title(main = "VaR ARCH(1)", line = 1, adj = 0)
+
+
+# garch
+
+#calcula VaR5
+in.sample.fit.garch = garch.fit@fit$sigma
+
+in.sample.VaR5.garch = mean(port.df$p.ret) + qnorm(0.05)*in.sample.fit.garch
+
+#grafico VaR5
+plot(port.df$data, port.df$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
+lines(port.df$data, qnorm(0.05)*sqrt(garch.fit@fit$var), col = "red")
+title(main = "VaR GARCH(1,1)", line = 1, adj = 0)
 
 
