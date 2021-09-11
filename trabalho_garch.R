@@ -32,7 +32,7 @@ price.data <- df %>%
             period = 'daily',
             col_rename = 'ret')
 
-price.data <- price.data[-c(1, 1235, 2469), ]
+price.data <- price.data[-c(1, 1484, 2967), ]
 
 port.df <- price.data %>% 
   tq_portfolio(assets_col = ticker,
@@ -48,7 +48,7 @@ port.df <- price.data %>%
 
 library(cowplot)
 
-p1 <- ggplot(price.data[1:1233, ], aes(data, ret)) + 
+p1 <- ggplot(price.data[1:1482, ], aes(data, ret)) + 
   geom_line() + 
   labs(title = ("BOVA11"),
        x = " ",
@@ -58,7 +58,7 @@ p1 <- ggplot(price.data[1:1233, ], aes(data, ret)) +
   theme(panel.grid.minor = element_blank()) + 
   geom_hline(yintercept = 0, color = 'red')
 
-p2 <- ggplot(price.data[1234:2466, ], aes(data, ret)) + 
+p2 <- ggplot(price.data[1483:2964, ], aes(data, ret)) + 
   geom_line() + 
   labs(title = ("IVVB11"),
        x = " ",
@@ -68,7 +68,7 @@ p2 <- ggplot(price.data[1234:2466, ], aes(data, ret)) +
   theme(panel.grid.minor = element_blank()) + 
   geom_hline(yintercept = 0, color = 'red')
 
-p3 <- ggplot(price.data[2467:3699, ], aes(data, ret)) + 
+p3 <- ggplot(price.data[2965:4446, ], aes(data, ret)) + 
   geom_line() + 
   labs(title = ("SMAL11"),
        x = " ",
@@ -93,9 +93,10 @@ grid1 <- plot_grid(p1, p2, p3, p4, nrow = 2,
 grid1
 
 
+
 #ESTATISTICAS DESCRITIVAS
 
-#assimetria e curtose n?o vem com o R
+#assimetria e curtose nao vem com o R
 library(moments)
 library(xtable)
 
@@ -159,60 +160,28 @@ print.xtable(tabela2, type = "html", file = "tabela2.html")
 
 
 
+#SEPARACAO DA AMOSTRA PARA PREVISAO
+
+port.sample <- filter(port.df, data < as.Date("2018-01-02"))
+
+ggplot(port.df, aes(data, p.ret)) +
+  geom_point() +
+  geom_vline(xintercept = port.df$data [741],  color = "red") +
+  labs(x = " ",
+       y = "Returns") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank())
+
+
+
 #SELECAO E ESTIMACAO DOS MODELOS
 
 library(rugarch)
 
-# arch 
-
-#escolhe a melhor defasagem atraves de criterios de informacao
-escolhe.ordem.arch = function(ret, modelo="sGARCH"){
-  max.order.q = 3
-  ICS = matrix(0, ncol = 2, nrow = 1*max.order.q)
-  nomes.linhas = vector(length = max.order.q)
-  cnt = 1
-  for (q in 2:max.order.q) {
-    spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
-                      variance.model = list(model = "sGARCH", garchOrder = c(q,0)),
-                      distribution.model = "norm")
-    fit = ugarchfit(data = port.df$p.ret, spec = spec, solver = 'hybrid')
-    print(q)
-    ICS[cnt,] = infocriteria(fit)[1:2]
-    nomes.linhas[cnt] = paste("ARCH(0,",q,")",sep = "")
-    cnt = cnt + 1
-  }  
-  melhor.AIC = (ICS[,1] == min(ICS[,1]))*1
-  melhor.BIC = (ICS[,2] == min(ICS[,2]))*1
-  out.mat = matrix(NA, ncol = 4, 1*max.order.q)
-  colnames(out.mat) = c("AIC", "min(AIC)", "BIC", "min(BIC)")
-  rownames(out.mat) = nomes.linhas
-  out.mat[,1] = ICS[,1]
-  out.mat[,2] = melhor.AIC
-  out.mat[,3] = ICS[,2]
-  out.mat[,4] = melhor.BIC
-  return(out.mat)
-}
-
-arch.BIC.AIC = escolhe.ordem.arch(port.df$p.ret)
-tabela3 <- xtable(arch.BIC.AIC)
-print.xtable(tabela3, type = "html", file = "tabela3.html")
-
-#primeiro fazemos a especificacao do modelo (no caso, a funcao teve problema para calcular os criterios do arch(1), mas podemos calcula-lo separadamente para comparar os valores), foi selecionado o arch(1)
-arch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
-                       variance.model = list(model = "sGARCH", garchOrder = c(1,0)),
-                       distribution.model = "norm")
-
-#agora estimamos o modelo
-arch.fit = ugarchfit(data = port.df$p.ret, spec = arch.spec, solver = 'hybrid')
-
-#grafico do desvio padrao condicional estimado
-plot(port.df$data, port.df$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
-lines(port.df$data, arch.fit@fit$sigma, col = "red")
-title(main = "ARCH", line = 1, adj = 0)
-
-
 # garch
 
+#escolhe a melhor defasagem atraves de criterios de informacao
 escolhe.ordem.garch = function(ret){
   max.order.p = 3
   max.order.q = 3
@@ -224,7 +193,7 @@ escolhe.ordem.garch = function(ret){
       spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                         variance.model = list(model = "sGARCH", garchOrder = c(q,p)),
                         distribution.model = "norm")
-      fit = ugarchfit(data = port.df$p.ret, spec = spec)
+      fit = ugarchfit(data = port.sample$p.ret, spec = spec)
       print(p)
       print(q)
       ICS[cnt,] = infocriteria(fit)[1:2]
@@ -244,49 +213,78 @@ escolhe.ordem.garch = function(ret){
   return(out.mat)
 }
 
-garch.BIC.AIC = escolhe.ordem.garch(port.df$p.ret)
-tabela4 <- xtable(garch.BIC.AIC)
-print.xtable(tabela4, type = "html", file = "tabela4.html")
+garch.BIC.AIC = escolhe.ordem.garch(port.sample$p.ret)
+tabela3 <- xtable(garch.BIC.AIC)
+print.xtable(tabela3, type = "html", file = "tabela3.html")
 
-#foi selecionado o garch(1,1)
+#primeiro fazemos a especificacao do modelo, foi selecionado o garch(1,1)
 garch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                         variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
                         distribution.model = "norm")
 
-garch.fit = ugarchfit(data = port.df$p.ret, spec = garch.spec)
+#agora estimamos o modelo
+garch.fit = ugarchfit(data = port.sample$p.ret, spec = garch.spec)
 
-#grafico do desvio padrao condicional estimado
-plot(port.df$data, port.df$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
-lines(port.df$data, garch.fit@fit$sigma, col = "red")
+#grafico do desvio padrao condicional estimado pelo GARCH dentro da amostra
+plot(port.sample$data, port.sample$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
+lines(port.sample$data, garch.fit@fit$sigma, col = "red")
 title(main = "GARCH", line = 1, adj = 0)
 
+
+# ewma
+
+ewma.spec = ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1,1)),
+                       mean.model = list(armaOrder = c(0,0), include.mean = TRUE),
+                       distribution.model = "norm", fixed.pars = list(omega = 0))
+
+ewma.fit = ugarchfit(data = port.sample$p.ret, spec = ewma.spec)
+
+plot(port.sample$data, port.sample$vol, t = "l", col = "grey", xlab = " ", ylab = "Retornos absolutos")
+lines(port.sample$data, ewma.fit@fit$sigma, col = "red")
+title(main = "EWMA", line = 1, adj = 0)
 
 
 #VALUE AT RISK DENTRO DA AMOSTRA
 
-# arch
-
-#calcula VaR5
-in.sample.fit.arch = arch.fit@fit$sigma
-
-in.sample.VaR5.arch = mean(port.df$p.ret) + qnorm(0.05)*in.sample.fit.arch
-
-#grafico VaR5
-plot(port.df$data, port.df$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
-lines(port.df$data, qnorm(0.05)*sqrt(arch.fit@fit$var), col = "red")
-title(main = "VaR ARCH(1)", line = 1, adj = 0)
-
-
 # garch
 
-#calcula VaR5
 in.sample.fit.garch = garch.fit@fit$sigma
 
-in.sample.VaR5.garch = mean(port.df$p.ret) + qnorm(0.05)*in.sample.fit.garch
+#calcula VaR5
+in.sample.VaR5.garch = mean(port.sample$p.ret) + qnorm(0.05)*in.sample.fit.garch
 
 #grafico VaR5
-plot(port.df$data, port.df$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
-lines(port.df$data, qnorm(0.05)*sqrt(garch.fit@fit$var), col = "red")
-title(main = "VaR GARCH(1,1)", line = 1, adj = 0)
+plot(port.sample$data, port.sample$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
+lines(port.sample$data, qnorm(0.05)*sqrt(garch.fit@fit$var), col = "red")
+title(main = "VaR5 GARCH(1,1)", line = 1, adj = 0)
+
+#calcula numero e porcentagem de violacoes
+viol.in.sample.VaR5.garch = (port.sample$p.ret < in.sample.VaR5.garch)*1
+pviol.in.sample.VaR5.garch = sum(viol.in.sample.VaR5.garch)/length(in.sample.VaR5.garch)
+
+#mostra numero e porcentagem de violacoes
+sum(viol.in.sample.VaR5.garch)
+pviol.in.sample.VaR5.garch
+
+
+# ewma
+
+in.sample.fit.ewma = ewma.fit@fit$sigma
+
+#calcula VaR5
+in.sample.VaR5.ewma = mean(port.sample$p.ret) + qnorm(0.05)*in.sample.fit.ewma
+
+#grafico VaR5
+plot(port.sample$data, port.sample$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
+lines(port.sample$data, qnorm(0.05)*sqrt(ewma.fit@fit$var), col = "red")
+title(main = "VaR5 EWMA", line = 1, adj = 0)
+
+#calcula numero e porcentagem de violacoes
+viol.in.sample.VaR5.ewma = (port.sample$p.ret < in.sample.VaR5.ewma)*1
+pviol.in.sample.VaR5.ewma = sum(viol.in.sample.VaR5.ewma)/length(in.sample.VaR5.ewma)
+
+#mostra numero e porcentagem de violacoes
+sum(viol.in.sample.VaR5.ewma)
+pviol.in.sample.VaR5.ewma
 
 
