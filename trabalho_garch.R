@@ -334,7 +334,7 @@ out.sample.ret = port.df$p.ret[742:length(port.df$p.ret)]
 # garch
 
 #faz a previsao fora da amostra
-garch.roll = ugarchroll(garch.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1)
+garch.roll = ugarchroll(garch.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
 garch.predicted.sigma = garch.roll@forecast$density %>% select(Sigma)
 garch.realized.ret = garch.roll@forecast$density %>% select(Realized)
 
@@ -360,7 +360,7 @@ pviol.out.sample.VaR5.garch
 # ewma 
 
 #faz a previsao fora da amostra
-ewma.roll = ugarchroll(ewma.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1)
+ewma.roll = ugarchroll(ewma.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
 ewma.predicted.sigma = ewma.roll@forecast$density %>% select(Sigma)
 ewma.realized.ret = ewma.roll@forecast$density %>% select(Realized)
 
