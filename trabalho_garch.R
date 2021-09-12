@@ -18,10 +18,10 @@ library(tidyquant)
 library(tidyverse)
 
 #carrega os dados do excel
-df <- read_excel('DADOS_TRABALHO.xlsx', 
-                 col_types = c('text','date', 'numeric'))
+df <- read_excel("DADOS_TRABALHO.xlsx", 
+                 col_types = c("text","date", "numeric"))
 
-df$data <- as.Date(df$data, format = '%Y-%m-%d')
+df$data <- as.Date(df$data, format = "%Y-%m-%d")
 
 #calcula os retornos
 price.data <- df %>% 
@@ -29,17 +29,19 @@ price.data <- df %>%
   group_by(ticker) %>%
   tq_mutate(select = price.close,
             mutate_fun = periodReturn,
-            period = 'daily',
-            col_rename = 'ret')
+            period = "daily",
+            col_rename = "ret")
 
+#tira as observacoes perdidas no calculo dos retornos
 price.data <- price.data[-c(1, 1484, 2967), ]
 
+#calcula o retorno e volatilidade (desvio padrão condicional) do portfolio
 port.df <- price.data %>% 
   tq_portfolio(assets_col = ticker,
                returns_col = ret,
                weights = c(0.5, 0.3, 0.2),
                geometric = FALSE,
-               col_rename = 'p.ret') %>% 
+               col_rename = "p.ret") %>% 
   mutate(vol = sqrt((p.ret-mean(p.ret, na.rm = TRUE))^2) )
 
 
@@ -56,7 +58,7 @@ p1 <- ggplot(price.data[1:1482, ], aes(data, ret)) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent) +
   theme(panel.grid.minor = element_blank()) + 
-  geom_hline(yintercept = 0, color = 'red')
+  geom_hline(yintercept = 0, color = "red")
 
 p2 <- ggplot(price.data[1483:2964, ], aes(data, ret)) + 
   geom_line() + 
@@ -66,7 +68,7 @@ p2 <- ggplot(price.data[1483:2964, ], aes(data, ret)) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent) +
   theme(panel.grid.minor = element_blank()) + 
-  geom_hline(yintercept = 0, color = 'red')
+  geom_hline(yintercept = 0, color = "red")
 
 p3 <- ggplot(price.data[2965:4446, ], aes(data, ret)) + 
   geom_line() + 
@@ -76,7 +78,7 @@ p3 <- ggplot(price.data[2965:4446, ], aes(data, ret)) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent) +
   theme(panel.grid.minor = element_blank()) + 
-  geom_hline(yintercept = 0, color = 'red') 
+  geom_hline(yintercept = 0, color = "red") 
 
 p4 <- ggplot(port.df, aes(data, p.ret)) + 
   geom_line() + 
@@ -86,7 +88,7 @@ p4 <- ggplot(port.df, aes(data, p.ret)) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent) +
   theme(panel.grid.minor = element_blank()) + 
-  geom_hline(yintercept = 0, color = 'red') 
+  geom_hline(yintercept = 0, color = "red") 
 
 grid1 <- plot_grid(p1, p2, p3, p4, nrow = 2, 
                    labels = " ")
@@ -100,26 +102,26 @@ grid1
 library(moments)
 library(xtable)
 
-stat.desc = matrix(NA, nrow = 8, ncol = 1)
+stat.desc = matrix(NA, nrow = 5, ncol = 4)
 
-rownames(stat.desc) = c("Obs.", "M?n.", "M?dia", "Mediana", "M?x.", "D.P.", "Assim.", "Curt.")
-colnames(stat.desc) = c("Retorno")
+rownames(stat.desc) = c("Obs.", "Media", "D.P.", "Assim.", "Curt.")
+colnames(stat.desc) = c("BOVA11","IVVB11", "SMAL11", "PORTOFOLIO")
 
 calc.stat.desc = function(x){
-  out = rep(0, 8)
+  out = rep(0, 5)
   out[1] = length(x)
-  out[2] = min(x)
-  out[3] = mean(x)
-  out[4] = median(x)
-  out[5] = max(x)
-  out[6] = sd(x)
-  out[7] = skewness(x)
-  out[8] = kurtosis(x) #curtose bruta
+  out[2] = mean(x)
+  out[3] = sd(x)
+  out[4] = skewness(x)
+  out[5] = kurtosis(x) #curtose bruta
   return(out)
 }
 
 #multiplica os retornos por 100 para ficar mais facil de interpretar a tabela. Ou seja, mostra-se a porcentagem, nao numeros decimais
-stat.desc[,1] = calc.stat.desc(100*port.df$p.ret)
+stat.desc[,1] = calc.stat.desc(100*price.data$ret[1:1482])
+stat.desc[,2] = calc.stat.desc(100*price.data$ret[1483:2964])
+stat.desc[,3] = calc.stat.desc(100*price.data$ret[2965:4446])
+stat.desc[,4] = calc.stat.desc(100*port.df$p.ret)
 
 #salva a tabela como arquivo
 tabela1 <- xtable(stat.desc, digits = 3)
@@ -127,7 +129,40 @@ print.xtable(tabela1, type = "html", file = "tabela1.html")
 
 
 
-#TESTES DE RAIZ UNITARIA(?)
+#TESTES DE RAIZ UNITARIA
+
+library(tseries)
+
+#ADF e PP H0 representa estacionariedade, KPPS H0 representa nao estacionariedade
+raiz.unitaria.mat1 = matrix(NA, ncol = 2, nrow = 3)
+colnames(raiz.unitaria.mat1) = c("Ret (statistic)", "Ret (p-value)")
+rownames(raiz.unitaria.mat1) = c("ADF", "PP", "KPSS")
+
+raiz.unitaria.mat1[1,1] = adf.test(port.df$p.ret, alternative = c("stationary"))$statistic
+raiz.unitaria.mat1[2,1] = pp.test(port.df$p.ret, alternative = c("stationary"))$statistic
+raiz.unitaria.mat1[3,1] = kpss.test(port.df$p.ret, null = c("Level"))$statistic
+
+raiz.unitaria.mat1[1,2] = adf.test(port.df$p.ret, alternative = c("stationary"))$p.value
+raiz.unitaria.mat1[2,2] = pp.test(port.df$p.ret, alternative = c("stationary"))$p.value
+raiz.unitaria.mat1[3,2] = kpss.test(port.df$p.ret, null = c("Level"))$p.value
+
+tabela2 <- xtable(raiz.unitaria.mat1)
+print.xtable(tabela2, type = "html", file = "tabela2.html")
+
+raiz.unitaria.mat2 = matrix(NA, ncol = 2, nrow = 3)
+colnames(raiz.unitaria.mat2) = c("Vol (statistic)","Vol (p-value)")
+rownames(raiz.unitaria.mat2) = c("ADF", "PP", "KPSS")
+
+raiz.unitaria.mat2[1,1] = adf.test(port.df$vol, alternative = c("stationary"))$statistic
+raiz.unitaria.mat2[2,1] = pp.test(port.df$vol, alternative = c("stationary"))$statistic
+raiz.unitaria.mat2[3,1] = kpss.test(port.df$vol, null = c("Level"))$statistic
+
+raiz.unitaria.mat2[1,2] = adf.test(port.df$vol, alternative = c("stationary"))$p.value
+raiz.unitaria.mat2[2,2] = pp.test(port.df$vol, alternative = c("stationary"))$p.value
+raiz.unitaria.mat2[3,2] = kpss.test(port.df$vol, null = c("Level"))$p.value
+
+tabela3 <- xtable(raiz.unitaria.mat2)
+print.xtable(tabela3, type = "html", file = "tabela3.html")
 
 
 
@@ -155,8 +190,8 @@ do_arch_test <- function(x, max_lag = 15) {
 
 arch.lm <- do_arch_test(x = port.df$p.ret, max_lag = 15)
 
-tabela2 <- xtable(arch.lm)
-print.xtable(tabela2, type = "html", file = "tabela2.html")
+tabela4 <- xtable(arch.lm)
+print.xtable(tabela4, type = "html", file = "tabela4.html")
 
 
 
@@ -168,7 +203,7 @@ ggplot(port.df, aes(data, p.ret)) +
   geom_point() +
   geom_vline(xintercept = port.df$data [741],  color = "red") +
   labs(x = " ",
-       y = "Returns") +
+       y = "Retornos") +
   scale_y_continuous(labels = scales::percent) +
   theme_bw() +
   theme(panel.grid.minor = element_blank())
@@ -181,7 +216,7 @@ library(rugarch)
 
 # garch
 
-#escolhe a melhor defasagem atraves de criterios de informacao
+#escolhe a melhor especificacao do modelo atraves de criterios de informacao (AIC/BIC)
 escolhe.ordem.garch = function(ret){
   max.order.p = 3
   max.order.q = 3
@@ -214,8 +249,8 @@ escolhe.ordem.garch = function(ret){
 }
 
 garch.BIC.AIC = escolhe.ordem.garch(port.sample$p.ret)
-tabela3 <- xtable(garch.BIC.AIC)
-print.xtable(tabela3, type = "html", file = "tabela3.html")
+tabela5 <- xtable(garch.BIC.AIC)
+print.xtable(tabela5, type = "html", file = "tabela5.html")
 
 #primeiro fazemos a especificacao do modelo, foi selecionado o garch(1,1)
 garch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
@@ -244,6 +279,7 @@ lines(port.sample$data, ewma.fit@fit$sigma, col = "red")
 title(main = "EWMA", line = 1, adj = 0)
 
 
+
 #VALUE AT RISK DENTRO DA AMOSTRA
 
 # garch
@@ -256,7 +292,7 @@ in.sample.VaR5.garch = mean(port.sample$p.ret) + qnorm(0.05)*in.sample.fit.garch
 #grafico VaR5
 plot(port.sample$data, port.sample$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
 lines(port.sample$data, qnorm(0.05)*sqrt(garch.fit@fit$var), col = "red")
-title(main = "VaR5 GARCH(1,1)", line = 1, adj = 0)
+title(main = "VaR5 GARCH", line = 1, adj = 0)
 
 #calcula numero e porcentagem de violacoes
 viol.in.sample.VaR5.garch = (port.sample$p.ret < in.sample.VaR5.garch)*1
@@ -286,5 +322,65 @@ pviol.in.sample.VaR5.ewma = sum(viol.in.sample.VaR5.ewma)/length(in.sample.VaR5.
 #mostra numero e porcentagem de violacoes
 sum(viol.in.sample.VaR5.ewma)
 pviol.in.sample.VaR5.ewma
+
+
+
+#PREVISAO
+
+library(timeSeries)
+oos.dates = port.df$data[742:length(port.df$data)]
+out.sample.ret = port.df$p.ret[742:length(port.df$p.ret)]
+
+# garch
+
+#faz a previsao fora da amostra
+garch.roll = ugarchroll(garch.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1)
+garch.predicted.sigma = garch.roll@forecast$density %>% select(Sigma)
+garch.realized.ret = garch.roll@forecast$density %>% select(Realized)
+
+#grafico da volatilidade media prevista
+plot(oos.dates, abs(garch.roll@forecast$density$Realized), xlab = " ", ylab = "Retornos absolutos")
+lines(oos.dates, garch.roll@forecast$density$Sigma, col = "blue", lw = 2)
+title(main = "PREVISÃO VOLATILIDADE GARCH", line = 1, adj = 0)
+
+#grafico do VaR5 previsto
+plot(oos.dates, garch.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos")
+lines(oos.dates, garch.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 2)
+title(main = "PREVISÃO VaR5 GARCH", line = 1, adj = 0)
+
+#calcula numero e porcentagem de violacoes
+viol.out.sample.VaR5.garch = (out.sample.ret < garch.roll@forecast$VaR$`alpha(5%)`)*1
+pviol.out.sample.VaR5.garch = sum(viol.out.sample.VaR5.garch)/length(garch.roll@forecast$VaR$`alpha(5%)`)
+
+#mostra numero e porcentagem de violacoes
+sum(viol.out.sample.VaR5.garch)
+pviol.out.sample.VaR5.garch
+
+
+# ewma 
+
+#faz a previsao fora da amostra
+ewma.roll = ugarchroll(ewma.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1)
+ewma.predicted.sigma = ewma.roll@forecast$density %>% select(Sigma)
+ewma.realized.ret = ewma.roll@forecast$density %>% select(Realized)
+
+#grafico da volatilidade media prevista
+plot(oos.dates, abs(ewma.roll@forecast$density$Realized), xlab = " ", ylab = "Retornos absolutos")
+lines(oos.dates, ewma.roll@forecast$density$Sigma, col = "blue", lw = 2)
+title(main = "PREVISÃO VOLATILIDADE EWMA", line = 1, adj = 0)
+
+#grafico do VaR5 previsto
+plot(oos.dates, ewma.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos")
+lines(oos.dates, ewma.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 2)
+title(main = "PREVISÃO VaR5 EWMA", line = 1, adj = 0)
+
+#calcula numero e porcentagem de violacoes
+viol.out.sample.VaR5.ewma = (out.sample.ret < ewma.roll@forecast$VaR$`alpha(5%)`)*1
+pviol.out.sample.VaR5.ewma = sum(viol.out.sample.VaR5.ewma)/length(ewma.roll@forecast$VaR$`alpha(5%)`)
+
+#mostra numero e porcentagem de violacoes
+sum(viol.out.sample.VaR5.ewma)
+pviol.out.sample.VaR5.ewma
+
 
 
