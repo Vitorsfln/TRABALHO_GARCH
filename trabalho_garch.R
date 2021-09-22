@@ -36,7 +36,7 @@ price.data <- df %>%
 price.data <- price.data[-c(1, 1484, 2967), ]
 
 #calcula o retorno e volatilidade (desvio padrão condicional) do portfolio
-port.df <- price.data %>% 
+ port.df <- price.data %>% 
   tq_portfolio(assets_col = ticker,
                returns_col = ret,
                weights = c(0.5, 0.3, 0.2),
@@ -105,7 +105,7 @@ library(xtable)
 stat.desc = matrix(NA, nrow = 5, ncol = 4)
 
 rownames(stat.desc) = c("Obs.", "Media", "D.P.", "Assim.", "Curt.")
-colnames(stat.desc) = c("BOVA11","IVVB11", "SMAL11", "PORTOFOLIO")
+colnames(stat.desc) = c("BOVA11","IVVB11", "SMAL11", "PORTFOLIO")
 
 calc.stat.desc = function(x){
   out = rep(0, 5)
@@ -129,9 +129,26 @@ print.xtable(tabela1, type = "html", file = "tabela1.html")
 
 
 
+#SEPARACAO DA AMOSTRA PARA PREVISAO
+
+port.sample <- filter(port.df, data < as.Date("2017-01-02"))
+
+ggplot(port.df, aes(data, p.ret)) +
+  geom_point() +
+  geom_vline(xintercept = port.df$data [495],  color = "red") +
+  labs(x = " ",
+       y = "Retornos") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank())
+
+
+
 #TESTES DE RAIZ UNITARIA
 
 library(tseries)
+
+#amostra total
 
 #ADF e PP H0 representa estacionariedade, KPPS H0 representa nao estacionariedade
 raiz.unitaria.mat1 = matrix(NA, ncol = 2, nrow = 3)
@@ -165,6 +182,39 @@ tabela3 <- xtable(raiz.unitaria.mat2)
 print.xtable(tabela3, type = "html", file = "tabela3.html")
 
 
+# amostra de estimação
+
+raiz.unitaria.mat3 = matrix(NA, ncol = 2, nrow = 3)
+colnames(raiz.unitaria.mat3) = c("Ret (statistic)", "Ret (p-value)")
+rownames(raiz.unitaria.mat3) = c("ADF", "PP", "KPSS")
+
+raiz.unitaria.mat3[1,1] = adf.test(port.sample$p.ret, alternative = c("stationary"))$statistic
+raiz.unitaria.mat3[2,1] = pp.test(port.sample$p.ret, alternative = c("stationary"))$statistic
+raiz.unitaria.mat3[3,1] = kpss.test(port.sample$p.ret, null = c("Level"))$statistic
+
+raiz.unitaria.mat3[1,2] = adf.test(port.sample$p.ret, alternative = c("stationary"))$p.value
+raiz.unitaria.mat3[2,2] = pp.test(port.sample$p.ret, alternative = c("stationary"))$p.value
+raiz.unitaria.mat3[3,2] = kpss.test(port.sample$p.ret, null = c("Level"))$p.value
+
+tabela2B <- xtable(raiz.unitaria.mat3)
+print.xtable(tabela2B, type = "html", file = "tabela2B.html")
+
+raiz.unitaria.mat4 = matrix(NA, ncol = 2, nrow = 3)
+colnames(raiz.unitaria.mat4) = c("Vol (statistic)","Vol (p-value)")
+rownames(raiz.unitaria.mat4) = c("ADF", "PP", "KPSS")
+
+raiz.unitaria.mat4[1,1] = adf.test(port.sample$vol, alternative = c("stationary"))$statistic
+raiz.unitaria.mat4[2,1] = pp.test(port.sample$vol, alternative = c("stationary"))$statistic
+raiz.unitaria.mat4[3,1] = kpss.test(port.sample$vol, null = c("Level"))$statistic
+
+raiz.unitaria.mat4[1,2] = adf.test(port.sample$vol, alternative = c("stationary"))$p.value
+raiz.unitaria.mat4[2,2] = pp.test(port.sample$vol, alternative = c("stationary"))$p.value
+raiz.unitaria.mat4[3,2] = kpss.test(port.sample$vol, null = c("Level"))$p.value
+
+tabela3B <- xtable(raiz.unitaria.mat4)
+print.xtable(tabela3B, type = "html", file = "tabela3B.html")
+
+
 
 #TESTE PARA EFEITOS ARCH
 
@@ -192,21 +242,6 @@ arch.lm <- do_arch_test(x = port.df$p.ret, max_lag = 15)
 
 tabela4 <- xtable(arch.lm)
 print.xtable(tabela4, type = "html", file = "tabela4.html")
-
-
-
-#SEPARACAO DA AMOSTRA PARA PREVISAO
-
-port.sample <- filter(port.df, data < as.Date("2018-01-02"))
-
-ggplot(port.df, aes(data, p.ret)) +
-  geom_point() +
-  geom_vline(xintercept = port.df$data [741],  color = "red") +
-  labs(x = " ",
-       y = "Retornos") +
-  scale_y_continuous(labels = scales::percent) +
-  theme_bw() +
-  theme(panel.grid.minor = element_blank())
 
 
 
@@ -252,7 +287,7 @@ garch.BIC.AIC = escolhe.ordem.garch(port.sample$p.ret)
 tabela5 <- xtable(garch.BIC.AIC)
 print.xtable(tabela5, type = "html", file = "tabela5.html")
 
-#primeiro fazemos a especificacao do modelo, foi selecionado o garch(1,1)
+#primeiro fazemos a especificacao do modelo, foi selecionado o garch(1,2), mas parametros sao estatisticamente insignificantes, logo optou-se pelo garch(1,1)
 garch.spec = ugarchspec(mean.model = list(armaOrder = c(0,0)),
                         variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
                         distribution.model = "norm")
@@ -290,7 +325,7 @@ in.sample.fit.garch = garch.fit@fit$sigma
 in.sample.VaR5.garch = mean(port.sample$p.ret) + qnorm(0.05)*in.sample.fit.garch
 
 #grafico VaR5
-plot(port.sample$data, port.sample$p.ret, col = "grey", xlab = " ", ylab = "Retornos")
+plot(port.sample$data, port.sample$p.ret, col = "grey", xlab = " ", ylab = "Retornos", type = "l")
 lines(port.sample$data, qnorm(0.05)*sqrt(garch.fit@fit$var), col = "red")
 title(main = "VaR5 GARCH", line = 1, adj = 0)
 
@@ -328,13 +363,13 @@ pviol.in.sample.VaR5.ewma
 #PREVISAO
 
 library(timeSeries)
-oos.dates = port.df$data[742:length(port.df$data)]
-out.sample.ret = port.df$p.ret[742:length(port.df$p.ret)]
+oos.dates = port.df$data[496:length(port.df$data)]
+out.sample.ret = port.df$p.ret[496:length(port.df$p.ret)]
 
 # garch
 
 #faz a previsao fora da amostra
-garch.roll = ugarchroll(garch.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
+garch.roll = ugarchroll(garch.spec, data = port.df$p.ret, n.start = 495, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
 garch.predicted.sigma = garch.roll@forecast$density %>% select(Sigma)
 garch.realized.ret = garch.roll@forecast$density %>% select(Realized)
 
@@ -344,8 +379,8 @@ lines(oos.dates, garch.roll@forecast$density$Sigma, col = "blue", lw = 2)
 title(main = "PREVISÃO VOLATILIDADE GARCH", line = 1, adj = 0)
 
 #grafico do VaR5 previsto
-plot(oos.dates, garch.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos")
-lines(oos.dates, garch.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 2)
+plot(oos.dates, garch.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos", type = "l", col = "grey")
+lines(oos.dates, garch.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 1)
 title(main = "PREVISÃO VaR5 GARCH", line = 1, adj = 0)
 
 #calcula numero e porcentagem de violacoes
@@ -360,7 +395,7 @@ pviol.out.sample.VaR5.garch
 # ewma 
 
 #faz a previsao fora da amostra
-ewma.roll = ugarchroll(ewma.spec, data = port.df$p.ret, n.start = 741, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
+ewma.roll = ugarchroll(ewma.spec, data = port.df$p.ret, n.start = 495, refit.every = 1, n.ahead = 1, refit.window = c("moving"))
 ewma.predicted.sigma = ewma.roll@forecast$density %>% select(Sigma)
 ewma.realized.ret = ewma.roll@forecast$density %>% select(Realized)
 
@@ -381,6 +416,5 @@ pviol.out.sample.VaR5.ewma = sum(viol.out.sample.VaR5.ewma)/length(ewma.roll@for
 #mostra numero e porcentagem de violacoes
 sum(viol.out.sample.VaR5.ewma)
 pviol.out.sample.VaR5.ewma
-
 
 
