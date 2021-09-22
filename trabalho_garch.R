@@ -35,7 +35,7 @@ price.data <- df %>%
 #tira as observacoes perdidas no calculo dos retornos
 price.data <- price.data[-c(1, 1484, 2967), ]
 
-#calcula o retorno e volatilidade (desvio padrão condicional) do portfolio
+#calcula o retorno e volatilidade (desvio padrao condicional) do portfolio
  port.df <- price.data %>% 
   tq_portfolio(assets_col = ticker,
                returns_col = ret,
@@ -182,7 +182,7 @@ tabela3 <- xtable(raiz.unitaria.mat2)
 print.xtable(tabela3, type = "html", file = "tabela3.html")
 
 
-# amostra de estimação
+# amostra de estimacao
 
 raiz.unitaria.mat3 = matrix(NA, ncol = 2, nrow = 3)
 colnames(raiz.unitaria.mat3) = c("Ret (statistic)", "Ret (p-value)")
@@ -376,12 +376,12 @@ garch.realized.ret = garch.roll@forecast$density %>% select(Realized)
 #grafico da volatilidade media prevista
 plot(oos.dates, abs(garch.roll@forecast$density$Realized), xlab = " ", ylab = "Retornos absolutos")
 lines(oos.dates, garch.roll@forecast$density$Sigma, col = "blue", lw = 2)
-title(main = "PREVISÃO VOLATILIDADE GARCH", line = 1, adj = 0)
+title(main = "PREVISAO VOLATILIDADE GARCH", line = 1, adj = 0)
 
 #grafico do VaR5 previsto
 plot(oos.dates, garch.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos", type = "l", col = "grey")
 lines(oos.dates, garch.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 1)
-title(main = "PREVISÃO VaR5 GARCH", line = 1, adj = 0)
+title(main = "PREVISAO VaR5 GARCH", line = 1, adj = 0)
 
 #calcula numero e porcentagem de violacoes
 viol.out.sample.VaR5.garch = (out.sample.ret < garch.roll@forecast$VaR$`alpha(5%)`)*1
@@ -402,12 +402,12 @@ ewma.realized.ret = ewma.roll@forecast$density %>% select(Realized)
 #grafico da volatilidade media prevista
 plot(oos.dates, abs(ewma.roll@forecast$density$Realized), xlab = " ", ylab = "Retornos absolutos")
 lines(oos.dates, ewma.roll@forecast$density$Sigma, col = "blue", lw = 2)
-title(main = "PREVISÃO VOLATILIDADE EWMA", line = 1, adj = 0)
+title(main = "PREVISAO VOLATILIDADE EWMA", line = 1, adj = 0)
 
 #grafico do VaR5 previsto
 plot(oos.dates, ewma.roll@forecast$density$Realized, xlab = " ", ylab = "Retornos")
 lines(oos.dates, ewma.roll@forecast$VaR$`alpha(5%)`, col = "red", lw = 2)
-title(main = "PREVISÃO VaR5 EWMA", line = 1, adj = 0)
+title(main = "PREVISAO VaR5 EWMA", line = 1, adj = 0)
 
 #calcula numero e porcentagem de violacoes
 viol.out.sample.VaR5.ewma = (out.sample.ret < ewma.roll@forecast$VaR$`alpha(5%)`)*1
